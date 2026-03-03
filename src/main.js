@@ -3,11 +3,13 @@ import { addRoute, navigate, startRouter } from "./router.js";
 import { homePage } from "./pages/home.js";
 import { paddleBallGame } from "./games/paddle-ball.js";
 import { snakeGame } from "./games/snake.js";
+import { minesweeperGame } from "./games/minesweeper.js";
 
 addRoute("/", homePage);
 
 addRoute("/game/paddle-ball", paddleBallGame);
 addRoute("/game/snake", snakeGame);
+addRoute("/game/minesweeper", minesweeperGame);
 
 addRoute("/game/:id", (params) => {
   const container = document.createElement("div");

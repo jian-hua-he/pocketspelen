@@ -16,6 +16,13 @@ const games = [
     playable: true,
   },
   {
+    id: "minesweeper",
+    title: "Minesweeper",
+    description: "Find all mines without detonating any",
+    emoji: "\uD83D\uDCA3",
+    playable: true,
+  },
+  {
     id: "memory",
     title: "Memory",
     description: "Flip cards and find matching pairs",
