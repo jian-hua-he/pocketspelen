@@ -22,28 +22,10 @@ const games = [
     emoji: "🃏",
   },
   {
-    id: "tic-tac-toe",
-    title: "Tic Tac Toe",
-    description: "Classic X and O strategy game",
-    emoji: "❌",
-  },
-  {
     id: "breakout",
     title: "Breakout",
     description: "Bounce the ball and smash all the bricks",
     emoji: "🧱",
-  },
-  {
-    id: "whack-a-mole",
-    title: "Whack-a-Mole",
-    description: "Test your reflexes by whacking moles",
-    emoji: "🔨",
-  },
-  {
-    id: "puzzle-slide",
-    title: "Puzzle Slide",
-    description: "Slide tiles to solve the picture puzzle",
-    emoji: "🧩",
   },
 ];
 
