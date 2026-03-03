@@ -7,15 +7,15 @@ help: ## Show this help
 dev: ## Start dev server at http://localhost:5173
 	docker compose up
 
-build: ## Production build to dist/
+build: ## Production build to docs/
 	docker compose run --rm dev npx vite build
 
 stop: ## Stop running containers
 	docker compose down
 
-clean: ## Remove containers, volumes, and dist/
+clean: ## Remove containers, volumes, and docs/
 	docker compose down -v
-	rm -rf dist
+	rm -rf docs
 
 install: ## Install npm dependencies
 	docker compose run --rm dev npm install
@@ -23,6 +23,6 @@ install: ## Install npm dependencies
 deploy: build ## Build and show deploy instructions
 	@echo ""
 	@echo "Build complete. To deploy:"
-	@echo "  git add dist/ && git commit -m 'build' && git push"
+	@echo "  git add docs/ && git commit -m 'build' && git push"
 	@echo ""
 	@echo "URL: https://jian-hua-he.github.io/pocketspelen/"
