@@ -22,7 +22,7 @@ function getCoverage(score) {
 }
 
 function getBallSpeed(score) {
-  return Math.min(250 + score * 2, 500);
+  return Math.min(400 + score * 3, 700);
 }
 
 export function paddleBallGame() {
@@ -53,7 +53,7 @@ export function paddleBallGame() {
   // State
   let W, H, P; // play area width, height, perimeter
   let ox, oy; // play area origin on canvas
-  let state = "start"; // start | playing | gameover
+  let state = "start"; // start | playing | paused | gameover
   let score = 0;
   let highScore = parseInt(localStorage.getItem(LS_KEY)) || 0;
 
@@ -169,6 +169,8 @@ export function paddleBallGame() {
     } else if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
       if (state === "start" || state === "gameover") startGame();
+      else if (state === "playing") state = "paused";
+      else if (state === "paused") state = "playing";
     }
   }
 
@@ -217,6 +219,10 @@ export function paddleBallGame() {
       requestTiltPermission();
       return;
     }
+    if (state === "paused") {
+      state = "playing";
+      return;
+    }
     const touch = e.touches[0];
     touchStartX = touch.clientX;
     touchLastX = touch.clientX;
@@ -244,7 +250,7 @@ export function paddleBallGame() {
     pulsePhase += dt * 3;
 
     // Move paddle
-    const PADDLE_SPEED = 600; // px/s along perimeter
+    const PADDLE_SPEED = 900; // px/s along perimeter
 
     if (isMobile && tiltPermissionGranted) {
       // Tilt-based movement: gamma ranges ~[-90, 90]
@@ -392,7 +398,7 @@ export function paddleBallGame() {
     drawPaddle();
 
     // Draw ball
-    if (state === "playing") {
+    if (state === "playing" || state === "paused") {
       drawBall();
     }
 
@@ -403,6 +409,7 @@ export function paddleBallGame() {
 
     // Overlays
     if (state === "start") drawStartOverlay(cw, ch);
+    if (state === "paused") drawPausedOverlay(cw, ch);
     if (state === "gameover") drawGameOverOverlay(cw, ch);
   }
 
@@ -488,14 +495,14 @@ export function paddleBallGame() {
   }
 
   function drawHUD(cw, ch) {
-    if (state !== "playing") return;
+    if (state !== "playing" && state !== "paused") return;
 
     ctx.save();
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "bold 24px monospace";
-    ctx.textAlign = "center";
+    ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    ctx.fillText(String(score), cw / 2, 12);
+    ctx.fillText(String(score), ox + W - 12, oy + 12);
     ctx.restore();
   }
 
@@ -523,6 +530,27 @@ export function paddleBallGame() {
     if (highScore > 0) {
       ctx.fillStyle = "#ffcc00";
       ctx.fillText(`High Score: ${highScore}`, cw / 2, ch / 2 + 70);
+    }
+    ctx.restore();
+  }
+
+  function drawPausedOverlay(cw, ch) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillRect(0, 0, cw, ch);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 36px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Paused", cw / 2, ch / 2 - 20);
+
+    ctx.font = "16px monospace";
+    ctx.fillStyle = "#aaaaaa";
+    if (isMobile) {
+      ctx.fillText("Tap to resume", cw / 2, ch / 2 + 20);
+    } else {
+      ctx.fillText("Press Space to resume", cw / 2, ch / 2 + 20);
     }
     ctx.restore();
   }

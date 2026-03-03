@@ -1,4 +1,8 @@
-.PHONY: dev build stop clean install
+.PHONY: help dev build stop clean install
+.DEFAULT_GOAL := help
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 dev: ## Start dev server at http://localhost:5173
 	docker compose up
