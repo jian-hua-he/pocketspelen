@@ -2,6 +2,13 @@ import { navigate } from "../router.js";
 
 const games = [
   {
+    id: "snake",
+    title: "Snake",
+    description: "Eat food and grow without hitting yourself",
+    emoji: "🐍",
+    playable: true,
+  },
+  {
     id: "paddle-ball",
     title: "Paddle Ball",
     description: "Bounce the ball with a perimeter paddle",
@@ -13,12 +20,6 @@ const games = [
     title: "Memory",
     description: "Flip cards and find matching pairs",
     emoji: "🃏",
-  },
-  {
-    id: "snake",
-    title: "Snake",
-    description: "Eat food and grow without hitting yourself",
-    emoji: "🐍",
   },
   {
     id: "tic-tac-toe",
