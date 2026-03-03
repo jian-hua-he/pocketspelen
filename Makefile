@@ -1,4 +1,4 @@
-.PHONY: help dev build stop clean install
+.PHONY: help dev build stop clean install deploy
 .DEFAULT_GOAL := help
 
 help: ## Show this help
@@ -19,3 +19,7 @@ clean: ## Remove containers, volumes, and dist/
 
 install: ## Install npm dependencies
 	docker compose run --rm dev npm install
+
+deploy: ## Deploy via GitHub Actions (push to master)
+	@echo "Deploying: push to master triggers GitHub Actions → GitHub Pages"
+	@echo "URL: https://jian-hua-he.github.io/pocketspelen/"
