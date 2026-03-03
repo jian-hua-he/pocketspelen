@@ -20,6 +20,9 @@ clean: ## Remove containers, volumes, and dist/
 install: ## Install npm dependencies
 	docker compose run --rm dev npm install
 
-deploy: ## Deploy via GitHub Actions (push to master)
-	@echo "Deploying: push to master triggers GitHub Actions → GitHub Pages"
+deploy: build ## Build and show deploy instructions
+	@echo ""
+	@echo "Build complete. To deploy:"
+	@echo "  git add dist/ && git commit -m 'build' && git push"
+	@echo ""
 	@echo "URL: https://jian-hua-he.github.io/pocketspelen/"
