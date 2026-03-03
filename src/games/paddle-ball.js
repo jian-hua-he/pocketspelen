@@ -21,7 +21,8 @@ function getCoverage(score) {
   return coverage;
 }
 
-function getBallSpeed(score) {
+function getBallSpeed(score, mobile) {
+  if (mobile) return Math.min(280 + score * 2, 480);
   return Math.min(400 + score * 3, 700);
 }
 
@@ -63,13 +64,15 @@ export function paddleBallGame() {
   // Paddle (perimeter coordinate)
   let paddleCenter = 0; // t in [0, P)
   let paddleHalf = 0;
-  let paddleSpeed = 0; // px/s along perimeter
 
   // Input state
   let inputDir = 0; // -1 left, 0 none, 1 right
   let isMobile = false;
   let tiltPermissionGranted = false;
-  let tiltGamma = 0;
+  let tiltGammaRaw = 0;
+  let tiltBetaRaw = 0;
+  let tiltGamma = 0; // smoothed
+  let tiltBeta = 0; // smoothed
   let touchStartX = null;
   let touchLastX = null;
 
@@ -103,7 +106,7 @@ export function paddleBallGame() {
     bx = W / 2;
     by = H / 2;
     const angle = Math.random() * Math.PI * 2;
-    const speed = getBallSpeed(0);
+    const speed = getBallSpeed(0, isMobile);
     bvx = Math.cos(angle) * speed;
     bvy = Math.sin(angle) * speed;
     // Ensure ball isn't moving too horizontally or vertically
@@ -188,41 +191,54 @@ export function paddleBallGame() {
   }
 
   function onDeviceOrientation(e) {
-    if (e.gamma != null) tiltGamma = e.gamma;
+    if (e.gamma != null) tiltGammaRaw = e.gamma;
+    if (e.beta != null) tiltBetaRaw = e.beta;
   }
 
-  async function requestTiltPermission() {
-    if (tiltPermissionGranted) return;
-    if (
-      typeof DeviceOrientationEvent !== "undefined" &&
-      typeof DeviceOrientationEvent.requestPermission === "function"
-    ) {
-      try {
-        const perm = await DeviceOrientationEvent.requestPermission();
-        if (perm === "granted") tiltPermissionGranted = true;
-      } catch {
-        // denied
-      }
-    } else {
-      tiltPermissionGranted = true;
-    }
-    if (tiltPermissionGranted) {
-      window.addEventListener("deviceorientation", onDeviceOrientation, {
-        signal,
-      });
-    }
+  function enableTiltListener() {
+    if (!tiltPermissionGranted) return;
+    window.addEventListener("deviceorientation", onDeviceOrientation, {
+      signal,
+    });
   }
 
-  function onTouchStart(e) {
+  // iOS 13+ requires requestPermission() called synchronously inside a
+  // click handler (not touchstart, not deferred via async/await).
+  // We use a click listener on the canvas to handle start/restart AND
+  // request gyroscope permission in one gesture.
+  function onCanvasClick() {
     if (state === "start" || state === "gameover") {
+      if (
+        !tiltPermissionGranted &&
+        typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function"
+      ) {
+        // Must call requestPermission synchronously in this click handler
+        DeviceOrientationEvent.requestPermission()
+          .then((perm) => {
+            if (perm === "granted") {
+              tiltPermissionGranted = true;
+              enableTiltListener();
+            }
+          })
+          .catch(() => {});
+      } else if (!tiltPermissionGranted) {
+        // Android / other browsers: no permission API needed
+        tiltPermissionGranted = true;
+        enableTiltListener();
+      }
       startGame();
-      requestTiltPermission();
       return;
     }
     if (state === "paused") {
       state = "playing";
       return;
     }
+  }
+
+  function onTouchStart(e) {
+    // click handler deals with start/gameover/paused
+    if (state !== "playing") return;
     const touch = e.touches[0];
     touchStartX = touch.clientX;
     touchLastX = touch.clientX;
@@ -253,12 +269,60 @@ export function paddleBallGame() {
     const PADDLE_SPEED = 900; // px/s along perimeter
 
     if (isMobile && tiltPermissionGranted) {
-      // Tilt-based movement: gamma ranges ~[-90, 90]
-      const deadZone = 5;
-      if (Math.abs(tiltGamma) > deadZone) {
-        const tiltInput = (tiltGamma - Math.sign(tiltGamma) * deadZone) / 30;
-        paddleCenter += tiltInput * PADDLE_SPEED * dt;
+      // Low-pass filter: smooth raw sensor noise
+      const smooth = 0.12;
+      tiltGamma += (tiltGammaRaw - tiltGamma) * smooth;
+      tiltBeta += (tiltBetaRaw - tiltBeta) * smooth;
+
+      // Dead zone: ignore tiny tilts (sensor drift)
+      const DEAD_ZONE = 3;
+      let gx = tiltGamma / 45;
+      let gy = (tiltBeta - 45) / 45;
+      if (Math.abs(tiltGamma) < DEAD_ZONE) gx = 0;
+      if (Math.abs(tiltBeta - 45) < DEAD_ZONE) gy = 0;
+
+      // Compute smoothly blended tangent direction.
+      // Corners are at t=0, W, W+H, 2W+H. Near corners, blend the
+      // tangents of the two meeting edges to prevent oscillation.
+      const t = ((paddleCenter % P) + P) % P;
+      const B = 50; // blend zone radius in px
+      // Edge tangents (clockwise): top(1,0) right(0,1) bottom(-1,0) left(0,-1)
+      // Corners: 0/P=top-left, W=top-right, W+H=bottom-right, 2W+H=bottom-left
+      const corners = [0, W, W + H, 2 * W + H];
+      const tangents = [
+        [1, 0], [0, 1], [-1, 0], [0, -1],
+      ];
+      // Start with the sharp tangent for current edge
+      let edgeIdx;
+      if (t <= W) edgeIdx = 0;
+      else if (t <= W + H) edgeIdx = 1;
+      else if (t <= 2 * W + H) edgeIdx = 2;
+      else edgeIdx = 3;
+      let tx = tangents[edgeIdx][0];
+      let ty = tangents[edgeIdx][1];
+
+      // Blend near each corner
+      for (let ci = 0; ci < 4; ci++) {
+        let dist = Math.abs(t - corners[ci]);
+        if (dist > P / 2) dist = P - dist; // wrap around
+        if (dist < B) {
+          const blend = dist / B; // 0 at corner, 1 at edge of zone
+          const prevEdge = (ci + 3) % 4; // edge before corner
+          const nextEdge = ci % 4; // edge after corner
+          tx = tangents[prevEdge][0] * (1 - blend) + tangents[nextEdge][0] * blend;
+          ty = tangents[prevEdge][1] * (1 - blend) + tangents[nextEdge][1] * blend;
+          // Normalise
+          const len = Math.sqrt(tx * tx + ty * ty) || 1;
+          tx /= len;
+          ty /= len;
+          break;
+        }
       }
+
+      // Project tilt onto blended tangent → instant velocity
+      const tiltStrength = gx * tx + gy * ty;
+      const TILT_SPEED = 2500;
+      paddleCenter += tiltStrength * TILT_SPEED * dt;
     }
 
     paddleCenter += inputDir * PADDLE_SPEED * dt;
@@ -268,7 +332,7 @@ export function paddleBallGame() {
     paddleHalf = (getCoverage(score) * P) / 2;
 
     // Move ball
-    const speed = getBallSpeed(score);
+    const speed = getBallSpeed(score, isMobile);
     const len = Math.sqrt(bvx * bvx + bvy * bvy);
     if (len > 0) {
       bvx = (bvx / len) * speed;
@@ -349,7 +413,7 @@ export function paddleBallGame() {
     bvx = nvx;
     bvy = nvy;
     // Ensure minimum velocity on each axis
-    const speed = getBallSpeed(score);
+    const speed = getBallSpeed(score, isMobile);
     const minComponent = speed * 0.2;
     if (Math.abs(bvx) < minComponent) bvx = minComponent * Math.sign(bvx || 1);
     if (Math.abs(bvy) < minComponent) bvy = minComponent * Math.sign(bvy || 1);
@@ -626,6 +690,7 @@ export function paddleBallGame() {
     window.addEventListener("keyup", onKeyUp, { signal });
 
     if (isMobile) {
+      canvas.addEventListener("click", onCanvasClick, { signal });
       canvas.addEventListener("touchstart", onTouchStart, {
         signal,
         passive: true,

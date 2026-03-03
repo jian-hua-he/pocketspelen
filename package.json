@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
+    "@vitejs/plugin-basic-ssl": "^2.1.4",
     "tailwindcss": "^4.2.1",
     "vite": "^7.3.1"
   }
